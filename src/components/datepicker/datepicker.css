@@ -172,6 +172,12 @@
         background: inherit;
       }
     }
+    .cell.not-current {
+      color: #c7c7c7;
+    &:hover{
+       background: inherit;
+     }
+    }
     .cell.day-header {
       font-size: 75%;
       white-space: nowrap;
