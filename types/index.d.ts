@@ -12,6 +12,7 @@ export interface Datepicker {
   disabledDates?: Record<string, any>;
   highlighted?: Record<string, any>;
   placeholder?: string;
+  range?: boolean;
   inline?: boolean;
   calendarClass?: [string, Record<string, any>];
   inputClass?: [string, Record<string, any>];
