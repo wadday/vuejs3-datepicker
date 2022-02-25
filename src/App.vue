@@ -21,6 +21,7 @@
         <li><a href="#Vmodel">V Model</a></li>
         <li><a href="#programmaticaccess">ProgrammaticAccess</a></li>
         <li><a href="#dayview">Day View</a></li>
+        <li><a href="#rangeview">Range View</a></li>
         <li><a href="#hview">Highlighted View</a></li>
         <li><a href="#month-view">Month View</a></li>
         <li><a href="#year-view">Year View</a></li>
@@ -54,6 +55,9 @@
         </div>
         <div class="ind" id="dayview">
           <DayView />
+        </div>
+        <div class="ind" id="rangeview">
+          <RangeView />
         </div>
         <div class="ind" id="hview">
           <HighlightedView />
@@ -96,10 +100,12 @@ import VModel from './components/examples/VModel.vue';
 import ProgrammaticAccess from './components/examples/ProgrammaticAccess.vue';
 import SlotView from './components/examples/Slotview.vue';
 import StringView from './components/examples/StringView.vue';
+import RangeView from './components/examples/RangeView.vue';
 
 export default defineComponent({
   name: 'App-Home',
   components: {
+    RangeView,
     Typeable,
     Disabled,
     DefaultValue,
