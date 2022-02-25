@@ -76,6 +76,29 @@
       </template>
     </picker-day>
 
+    <!--Range view -->
+    <PickerRange
+      v-if="allowedToShowView('range')"
+      :allowed-to-show-view="allowedToShowView"
+      :format="format"
+      :selectedDate="selectedRange"
+      :calendar-style="calendarStyle"
+      :calendar-class="calendarClass"
+      :translation="translation"
+      :is-rtl="isRtl"
+      :page-date="pageDate"
+      :page-timestamp="pageTimestamp"
+      :monday-first="mondayFirst"
+      :day-cell-content="dayCellContent"
+      :use-utc="useUtc"
+      :disabledDates="disabledDates"
+      :showRangeView="showRangeView"
+      :preventDisableDateSelection="preventDisableDateSelection"
+      :theme="theme"
+      @changedMonth="handleChangedMonthFromDayPicker"
+      @selectDate="selectDateRange"
+    ></PickerRange>
+
     <!--Month View -->
     <picker-month
       v-if="allowedToShowView('month')"
@@ -130,10 +153,11 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch, ref } from 'vue';
+import { defineComponent, computed, watch, ref, reactive } from 'vue';
 import clickOutside from '../../directives/click-outside';
 import DateInput from './DateInput.vue';
 import PickerDay from './PickerDay.vue';
+import PickerRange from './PickerRange.vue';
 import PickerMonth from './PickerMonth.vue';
 import PickerYear from './PickerYear.vue';
 import * as Langlist from './locale/index';
@@ -144,6 +168,7 @@ export default defineComponent({
   components: {
     DateInput,
     PickerDay,
+    PickerRange,
     PickerMonth,
     PickerYear,
   },
@@ -157,6 +182,12 @@ export default defineComponent({
     value: {
       type: [Date as new () => Date, String, Number],
     },
+    startDate: {
+      type: [Date as new () => Date, String, Number],
+    },
+    endDate: {
+      type: [Date as new () => Date, String, Number],
+    },
     format: {
       type: [String, Function],
       default: 'dd MMM yyyy',
@@ -164,6 +195,9 @@ export default defineComponent({
     language: {
       type: String,
       default: 'en',
+    },
+    range: {
+      type: Boolean,
     },
     openDate: {
       validator: (val: Date): boolean => validateDateInput(val),
@@ -282,28 +316,38 @@ export default defineComponent({
     'changed-day',
     'selected',
     'selected-disabled',
+    'update:startDate',
+    'update:endDate',
   ],
   setup(props, { emit }) {
-    const initmodelvalue = new Date((props.modelValue as unknown) as Date);
+    const initModelValue = new Date((props.modelValue as unknown) as Date);
     const pageTimestamp = ref<number>(0);
     const selectedDate = ref<Date | string | null>(null);
-    if (props.modelValue && isValidDate(initmodelvalue)) {
-      pageTimestamp.value = initmodelvalue.getTime();
-      selectedDate.value = initmodelvalue;
+    const selectedRange = reactive<any>({
+      start: null,
+      end: null,
+    });
+    if (props.modelValue && isValidDate(initModelValue)) {
+      pageTimestamp.value = initModelValue.getTime();
+      selectedDate.value = initModelValue;
     }
     if (props.openDate) {
       pageTimestamp.value = setDate(new Date(props.openDate), 1);
     }
     const showDayView = ref(false);
     const showMonthView = ref(false);
+    const showRangeView = ref(false);
     const showYearView = ref(false);
     const calendarHeight = ref(0);
     const resetTypedDate = ref(new Date());
 
     /** ********************************** Computed  *********************************** */
     const computedInitialView = computed(() => {
-      if (!props.initialView) {
+      if (!props.initialView && !props.range) {
         return props.minimumView;
+      }
+      if (props.range) {
+        return 'range';
       }
       return props.initialView;
     });
@@ -319,6 +363,10 @@ export default defineComponent({
 
     const isInline = computed(() => {
       return !!props.inline;
+    });
+
+    const isRange = computed(() => {
+      return !!props.range;
     });
 
     const calendarStyle = computed(() => {
@@ -356,7 +404,7 @@ export default defineComponent({
      * @return {Boolean}
      */
     function allowedToShowView(view: string): boolean {
-      const views = ['day', 'month', 'year'];
+      const views = ['day', 'range', 'month', 'year'];
       const minimumViewIndex = views.indexOf(props.minimumView);
       const maximumViewIndex = views.indexOf(props.maximumView);
       const viewIndex = views.indexOf(view);
@@ -372,6 +420,7 @@ export default defineComponent({
       showDayView.value = false;
       showMonthView.value = false;
       showYearView.value = false;
+      showRangeView.value = false;
       if (!isInline.value) {
         if (emitEvent) {
           emit('closed');
@@ -403,6 +452,20 @@ export default defineComponent({
       showMonthView.value = true;
       return true;
     }
+
+    /**
+     * Show the range picker
+     * @return {Boolean}
+     */
+    function showRangeCalendar(): boolean {
+      if (!allowedToShowView('range')) {
+        return false;
+      }
+      close();
+      showRangeView.value = true;
+      return true;
+    }
+
     /**
      * Show the year picker
      * @return {Boolean}
@@ -431,6 +494,9 @@ export default defineComponent({
           break;
         case 'month':
           showMonthCalendar();
+          break;
+        case 'range':
+          showRangeCalendar();
           break;
         default:
           showDayCalendar();
@@ -469,6 +535,33 @@ export default defineComponent({
     }
 
     /**
+     * Set the selected date range
+     * @param {Number} timestamp
+     */
+    function setDateRange(timestamp: string | number | Date): void {
+      const date = new Date(timestamp);
+      if (selectedRange.end) {
+        selectedRange.end = null;
+        selectedRange.start = date;
+      } else if (selectedRange.start) {
+        if (selectedRange.start.getTime() > date.getTime()) {
+          selectedRange.start = date;
+        } else {
+          selectedRange.end = date;
+        }
+      } else {
+        selectedRange.start = date;
+      }
+      console.log(selectedRange);
+      selectedDate.value = selectedRange.start;
+      setPageDate(date);
+      emit('selected', date);
+      emit('update:startDate', selectedRange.start);
+      emit('update:endDate', selectedRange.end);
+      emit('input', date);
+    }
+
+    /**
      * Clear the selected date
      */
     function clearDate(): void {
@@ -493,6 +586,18 @@ export default defineComponent({
       }
       resetTypedDate.value = new Date();
     }
+
+    /**
+     * @param {Object} date
+     */
+    function selectDateRange(date: { timestamp: string | number | Date }): void {
+      setDateRange(date.timestamp);
+      if (!isInline.value && selectedRange.end) {
+        close(true);
+      }
+      resetTypedDate.value = new Date();
+    }
+
     /**
      * @param {Object} date
      */
@@ -531,15 +636,32 @@ export default defineComponent({
      * Set the datepicker value
      * @param {Date|String|Number|null} date
      */
-    function setValue(date?: Date | string | number): void {
+    function setValue(date?: Date | string | number | any): void {
       let tempDate = date;
-      if (typeof date === 'string' || typeof date === 'number') {
-        const parsed = new Date(date);
-        tempDate = Number.isNaN(parsed.valueOf()) ? '' : parsed;
+      if (typeof date === 'string' || typeof date === 'number' || typeof date === 'object') {
+        if (isRange.value) {
+          const parsed = new Date(date.start);
+          const end = new Date(date.end);
+          date = Number.isNaN(parsed.valueOf()) ? '' : parsed;
+          selectedRange.value = {
+            start: date,
+            end: Number.isNaN(end.valueOf()) ? '' : end,
+          };
+        } else {
+          const parsed = new Date(date);
+          tempDate = Number.isNaN(parsed.valueOf()) ? '' : parsed;
+        }
       }
       if (!tempDate) {
         setPageDate();
-        selectedDate.value = null;
+        if (isRange.value) {
+          selectedRange.value = {
+            start: null,
+            end: null,
+          };
+        } else {
+          selectedDate.value = null;
+        }
         return;
       }
       selectedDate.value = tempDate as Date;
@@ -613,6 +735,7 @@ export default defineComponent({
       pageTimestamp,
       selectedDate,
       showDayView,
+      showRangeView,
       showMonthView,
       showYearView,
       calendarHeight,
@@ -638,8 +761,10 @@ export default defineComponent({
       showMonthCalendar,
       setPageDate,
       selectDate,
+      selectDateRange,
       closeOnClickOutside,
       showDayCalendar,
+      selectedRange,
       computedInitialView,
       setDate,
       setDate1,
